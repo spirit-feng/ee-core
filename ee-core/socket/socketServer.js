@@ -3,7 +3,7 @@
 const { Server } = require('socket.io');
 const is = require('is-type-of');
 const Log = require('../log');
-const Conf = require('../config');
+const Conf = require('../config/cache');
 const Ps = require('../ps');
 const Channel = require('../const/channel');
 
@@ -28,13 +28,13 @@ class SocketServer {
     Log.coreLogger.info('[ee-core] [socket/socketServer] port is:', port);
 
     this.io = new Server(port, options);
-    this.connec();
+    this.connec(options);
   }
 
-  connec () {
+  connec (opt = {}) {
     const app = this.app;
     this.io.on('connection', (socket) => {
-      const channel = Channel.socketIo.partySoftware;
+      const channel = opt.channel || Channel.socketIo.partySoftware;
       this.socket = socket;
       socket.on(channel, async (message, callback) => {
         Log.coreLogger.info('[ee-core] [socket/socketServer] socket id:' + socket.id + ' message cmd: ' + message.cmd);
@@ -42,7 +42,7 @@ class SocketServer {
         try {
           // 找函数
           const cmd = message.cmd;
-          const args = message.params;
+          const args = message.args || message.params;
           let fn = null;
           if (is.string(cmd)) {
             const actions = cmd.split('.');
@@ -56,7 +56,9 @@ class SocketServer {
           if (!fn) throw new Error('function not exists');
 
           const result = await fn.call(app, args);
-          callback(result);
+          if (callback) {
+            callback(result);
+          }
         } catch (err) {
           Log.coreLogger.error('[ee-core] [socket/socketServer] throw error:', err);
         }
